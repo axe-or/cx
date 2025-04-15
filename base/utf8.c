@@ -19,10 +19,6 @@
 
 #define CONT ((u32)0x80) /* 10xx_xxxx */
 
-#define UTF8_ERROR ((rune)0xfffd)
-
-#define UTF8_ERROR_ENCODED ((UTF8Encoded){ .bytes = {0xef, 0xbf, 0xbd}, .len = 0 })
-
 #define UTF8_DECODE_ERROR ((UTF8Decoded){ .codepoint = UTF8_ERROR, .len = 1 })
 
 i32 utf8_rune_size(rune c){

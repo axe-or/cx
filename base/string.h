@@ -27,6 +27,10 @@ bool utf8_is_continuation_byte(rune c){
 	return (c >= CONTINUATION1) && (c <= CONTINUATION2);
 }
 
+#define UTF8_ERROR ((rune)0xfffd)
+
+#define UTF8_ERROR_ENCODED ((UTF8Encoded){ .bytes = {0xef, 0xbf, 0xbd}, .len = 0 })
+
 i32 utf8_rune_size(rune c);
 
 UTF8Encoded utf8_encode(rune r);

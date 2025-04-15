@@ -5,8 +5,8 @@
 
 typedef struct {
 	String source;
-	usize current;
-	usize previous;
+	isize current;
+	isize previous;
 } Lexer;
 
 typedef enum {
@@ -91,6 +91,40 @@ typedef struct {
 		String value_string;
 	};
 } Token;
+
+rune lexer_peek(Lexer* lex, isize delta){
+	isize pos = lex->current + delta;
+	if(pos < 0 || pos >= lex->source.len){
+		return 0; /* OOB */
+	}
+
+	UTF8Decoded dec = utf8_decode(lex->source.v + pos, lex->source.len - pos);
+	return dec.codepoint;
+}
+
+rune lexer_advance(Lexer* lex){
+	if(lex->current >= lex->source.len){
+		return 0; /* EOF */
+	}
+
+	UTF8Decoded dec = utf8_decode(lex->source.v + lex->current, lex->source.len - lex->current);
+	if(dec.codepoint == UTF8_ERROR){
+		lex->current += 1;
+		return UTF8_ERROR; /* Invalid char */
+	}
+
+	lex->current += dec.len;
+	return dec.codepoint;
+}
+
+bool lexer_match_advance(Lexer* lex, rune target){
+	rune c = lexer_peek(lex, 0);
+	if(c == target){
+		lex->current += utf8_rune_size(c);
+		return true;
+	}
+	return false;
+}
 
 int main(){
 }
