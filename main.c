@@ -7,7 +7,7 @@ typedef struct {
 	String source;
 	usize current;
 	usize previous;
-} Lexer:
+} Lexer;
 
 typedef enum {
 	Tk_Unknown = 0,
