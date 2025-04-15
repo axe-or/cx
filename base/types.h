@@ -9,18 +9,18 @@
 #endif
 
 #if defined(COMPILER_MSVC)
-	#define forceinline __forceinline
+	#define force_inline __forceinline
 #else
-	#define forceinline __attribute__((always_inline)) inline
+	#define force_inline __attribute__((always_inline)) inline
 #endif
 
 #define static_assert(Pred, Msg) _Static_assert((Pred), (Msg))
 
-#define Min(A, B) (((A) < (B)) ? (A) : (B))
+#define min(A, B) (((A) < (B)) ? (A) : (B))
 
-#define Max(A, B) (((A) > (B)) ? (A) : (B))
+#define max(A, B) (((A) > (B)) ? (A) : (B))
 
-#define Clamp(Lo, X, Hi) Min(Max(Lo, X), Hi)
+#define clamp(Lo, X, Hi) min(max(Lo, X), Hi)
 
 //// Core types
 #include <stdint.h>
@@ -54,9 +54,9 @@ typedef struct {
 	isize len;
 } String;
 
-// String literal
-#define StrLit(S) ((String){.v = (byte const*)("" S ""), .len = (sizeof(S) - 1)})
-// To be used with `%.*s`
-#define StrFmt(S) (int)(S.len), (char const*)(S.v)
 
+// String literal
+#define str_lit(S) ((String){.v = (byte const*)("" S ""), .len = (sizeof(S) - 1)})
+// To be used with `%.*s`
+#define str_fmt(S) (int)(S.len), (char const*)(S.v)
 
