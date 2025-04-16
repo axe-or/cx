@@ -78,11 +78,11 @@ typedef enum {
 	// Control
 	Tk_Invalid,
 	Tk_EndOfFile,
-} TokenKind;
+} TokenType;
 
 typedef struct {
 	String lexeme;
-	u32 kind;
+	u32 type;
 
 	union {
 		f64    value_real;
@@ -124,6 +124,17 @@ bool lexer_match_advance(Lexer* lex, rune target){
 		return true;
 	}
 	return false;
+}
+
+Token lexer_next(Lexer* lex){
+	Token res = {};
+	rune c = lexer_advance(lex);
+	if(c == 0){
+		res.type = Tk_EndOfFile;
+		return res;
+	}
+
+	unimplemented("lexer");
 }
 
 int main(){
