@@ -36,89 +36,87 @@ String str_sub(String s, isize start, isize end){
 	return (String){ .v = s.v + start, .len = end - start };
 }
 
-// #define STRCONV_TEMP_BUFFER_SIZE 128
+static inline
+i64 str_ipow10(int exponent){
+	ensure(exponent >= 0, "Invalid exponent");
+	i64 n = 1;
+	for(int i = 0; i < exponent; i++){
+		n *= 10;
+	}
+	return n;
+}
 
-// static inline
-// i64 str_ipow10(int exponent){
-// 	ensure(exponent >= 0, "Invalid exponent");
-// 	i64 n = 1;
-// 	for(int i = 0; i < exponent; i++){
-// 		n *= 10;
-// 	}
-// 	return n;
-// }
+static inline
+int str_digit_value(char c, int base){
+	int val = -1;
+	switch(base){
+	case 2: {
+		if(c == '0' || c == '1'){
+			val = c - '0';
+		}
+	} break;
+	case 8: {
+		if(c >= '0' && c <= '7'){
+			val = c - '0';
+		}
+	} break;
+	case 10: {
+		if(c >= '0' && c <= '9'){
+			val = c - '0';
+		}
+	} break;
+	case 16: {
+		if(c >= '0' && c <= '9'){
+			val = c - '0';
+		} else if(c >= 'A' && c <= 'F'){
+			val = c - 'A' + 10;
+		} else if(c >= 'a' && c <= 'f') {
+			val = c - 'a' + 10;
+		}
+	} break;
+	}
+	return val;
+}
 
-// static inline
-// int str_digit_value(char c, int base){
-// 	int val = -1;
-// 	switch(base){
-// 	case 2: {
-// 		if(c == '0' || c == '1'){
-// 			val = c - '0';
-// 		}
-// 	} break;
-// 	case 8: {
-// 		if(c >= '0' && c <= '7'){
-// 			val = c - '0';
-// 		}
-// 	} break;
-// 	case 10: {
-// 		if(c >= '0' && c <= '9'){
-// 			val = c - '0';
-// 		}
-// 	} break;
-// 	case 16: {
-// 		if(c >= '0' && c <= '9'){
-// 			val = c - '0';
-// 		} else if(c >= 'A' && c <= 'F'){
-// 			val = c - 'A' + 10;
-// 		} else if(c >= 'a' && c <= 'f') {
-// 			val = c - 'a' + 10;
-// 		}
-// 	} break;
-// 	}
-// 	return val;
-// }
+bool str_parse_i64(String s, u32 base, i64* out){
+	if(s.len == 0){ return false; }
 
-// bool str_parse_i64(String s, u32 base, i64* out){
-// 	if(s.len == 0){ return false; }
+	bool negate = false;
+	if(s.v[0] == '-'){
+		negate = true;
+		s = str_sub(s, 1, s.len);
+	}
 
-// 	bool negate = false;
-// 	if(s.v[0] == '-'){
-// 		negate = true;
-// 		s = str_sub(s, 1, s.len);
-// 	}
+	i64 n = 0;
+	*out = 0;
 
-// 	i64 n = 0;
-// 	*out = 0;
+	int digit_count = 0;
+	for(isize i = s.len - 1; i >= 0; i -= 1){
+		char c = s.v[i];
+		if(c == '_'){ continue; }
 
-// 	int digit_count = 0;
-// 	for(isize i = s.len - 1; i >= 0; i -= 1){
-// 		char c = s.v[i];
-// 		if(c == '_'){ continue; }
+		i64 dig = str_digit_value(c, 16);
+		if(dig < 0){
+			return false;
+		}
 
-// 		i64 dig = str_digit_value(c, 16);
-// 		if(dig < 0){
-// 			return false;
-// 		}
+		switch(base){
+		case 2:  n |= dig << digit_count; break;
+		case 8:  n |= dig << (digit_count * 3); break;
+		case 16: n |= dig << (digit_count * 4); break;
+		case 10: n += dig * str_ipow10(digit_count); break;
+		}
 
-// 		switch(base){
-// 		case 2:  n |= dig << digit_count; break;
-// 		case 8:  n |= dig << (digit_count * 3); break;
-// 		case 16: n |= dig << (digit_count * 4); break;
-// 		case 10: n += dig * str_ipow10(digit_count); break;
-// 		}
+		digit_count += 1;
+	}
 
-// 		digit_count += 1;
-// 	}
+	if(negate){
+		n = -n;
+	}
 
-// 	if(negate){
-// 		n = -n;
-// 	}
-
-// 	*out = n;
-// 	return true;
-// }
+	*out = n;
+	return true;
+}
 
 // bool str_parse_f64(String s, f64* out){
 // 	if(s.len == 0){ return false; }
