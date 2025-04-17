@@ -282,7 +282,54 @@ Token lexer_match_number(Lexer* lex){
 	}
 	else {
 		lex->current = lex->previous;
-		panic("Decimal");
+		bool is_float = false;
+		bool has_exp = false;
+
+		for(;;){
+			rune c = lexer_advance(lex);
+			if(c == 0){ break; }
+			if(c == '_'){ continue; }
+
+			if(c == '.' && !is_float){
+				is_float = true;
+				continue;
+			}
+
+			if(c == 'e' && !has_exp){
+				is_float = true;
+				has_exp = true;
+				// Optionally consume exponent sign
+				lexer_advance_if(lex, '+');
+				lexer_advance_if(lex, '-');
+				continue;
+			}
+
+			if(!rune_is_digit(c, 10)){
+				lex->current -= utf8_rune_size(c);
+				break;
+			}
+		}
+
+
+		String digits = lexer_current_lexeme(lex);
+
+		if(is_float){
+			res.type = Tk_Real;
+			f64 val = 0;
+			if(!str_parse_f64(digits, &val)){
+				panic("bad float");
+			}
+			res.value_real = val;
+		}
+		else {
+			res.type = Tk_Integer;
+			i64 val = 0;
+			if(!str_parse_i64(digits, 10, &val)){
+				panic("bad decimal");
+			}
+			res.value_integer = val;
+		}
+
 	}
 
 	return res;
@@ -295,7 +342,7 @@ int token_print(Token t){
 		return printf("Int(%td)", t.value_integer);
 	}
 	if(t.type == Tk_Real){
-		return printf("Int(%g)", t.value_real);
+		return printf("Real(%g)", t.value_real);
 	}
 	if(t.type == Tk_String){
 		return printf("Str(\"%.*s\")", str_fmt(t.value_string));
@@ -474,6 +521,8 @@ int main(){
 		" 0xff_00_1a"
 		" 0b1010"
 		" 0o777"
+		" 69_420"
+		" 69.420e-5"
 	);
 
 	Lexer lex = {

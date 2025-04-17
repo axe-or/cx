@@ -128,32 +128,34 @@ bool str_parse_i64(String s, u32 base, i64* out){
 	return true;
 }
 
-// bool str_parse_f64(String s, f64* out){
-// 	if(s.len == 0){ return false; }
+#define STRCONV_TEMP_BUFFER_SIZE 512
 
-// 	*out = 0;
-// 	char digits[STRCONV_TEMP_BUFFER_SIZE] = {0};
-// 	isize digit_count = 0;
+bool str_parse_f64(String s, f64* out){
+	if(s.len == 0){ return false; }
 
-// 	/* Extract digits only */ {
-// 		for(isize i = 0; i < s.len && digit_count < STRCONV_TEMP_BUFFER_SIZE; i++){
-// 			char c = s.v[i];
-// 			if(c == '_'){ continue; }
+	*out = 0;
+	char digits[STRCONV_TEMP_BUFFER_SIZE] = {0};
+	isize digit_count = 0;
 
-// 			digits[digit_count] = s.v[i];
-// 			digit_count += 1;
-// 		}
-// 	}
+	/* Extract digits only */ {
+		for(isize i = 0; i < s.len && digit_count < STRCONV_TEMP_BUFFER_SIZE; i++){
+			char c = s.v[i];
+			if(c == '_'){ continue; }
 
-// 	char* p = 0;
+			digits[digit_count] = s.v[i];
+			digit_count += 1;
+		}
+	}
 
-// 	f64 val = strtod(&digits[0], &p);
-// 	if(p != &digits[digit_count]){
-// 		return false;
-// 	}
+	char* p = 0;
 
-// 	*out = val;
-// 	return true;
-// }
+	f64 val = strtod(&digits[0], &p);
+	if(p != &digits[digit_count]){
+		return false;
+	}
 
-// #undef STRCONV_TEMP_BUFFER_SIZE
+	*out = val;
+	return true;
+}
+
+#undef STRCONV_TEMP_BUFFER_SIZE
