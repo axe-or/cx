@@ -1,5 +1,18 @@
 #include "cx.h"
-#include "base/string.h"
+
+str_attribute_format(3,4)
+void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...) {
+	String s = {};
+	CompilerError* new_error = arena_make(lex->arena, CompilerError, 1);
+	new_error->type = errtype;
+	new_error->next = lex->error;
+	lex->error = new_error;
+
+	va_list argp;
+	va_start(argp, fmt);
+	new_error->message = str_vformat(lex->arena, fmt, argp);
+	va_end(argp);
+}
 
 static inline
 bool is_alpha(rune c){
@@ -408,4 +421,28 @@ Token lexer_next(Lexer* lex){
 
 	return res;
 }
+
+String token_format(Token t, Arena* arena){
+	ensure(t.type >= 0 && t.type < Tk__COUNT, "Invalid type value");
+
+	if(t.type == Tk_Integer){
+		return str_format(arena, "Int(%td)", t.value_integer);
+	}
+	if(t.type == Tk_Real){
+		return str_format(arena, "Real(%g)", t.value_real);
+	}
+	if(t.type == Tk_String){
+		return str_format(arena, "Str(\"%.*s\")", str_fmt(t.value_string));
+	}
+	if(t.type == Tk_Char){
+		return str_format(arena, "Char(%d)", t.value_char);
+	}
+	if(t.type == Tk_Id){
+		return str_format(arena, "Id(%.*s)", str_fmt(t.lexeme));
+	}
+
+	String name = token_type_name[t.type];
+	return str_format(arena, "%.*s", str_fmt(name));
+}
+
 

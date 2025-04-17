@@ -5,43 +5,6 @@
 
 #include "cx.h"
 
-str_attribute_format(3,4)
-void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...) {
-	String s = {};
-	CompilerError* new_error = arena_make(lex->arena, CompilerError, 1);
-	new_error->type = errtype;
-	new_error->next = lex->error;
-	lex->error = new_error;
-
-	va_list argp;
-	va_start(argp, fmt);
-	new_error->message = str_vformat(lex->arena, fmt, argp);
-	va_end(argp);
-}
-
-int token_print(Token t){
-	ensure(t.type >= 0 && t.type < Tk__COUNT, "Invalid type value");
-
-	if(t.type == Tk_Integer){
-		return printf("Int(%td)", t.value_integer);
-	}
-	if(t.type == Tk_Real){
-		return printf("Real(%g)", t.value_real);
-	}
-	if(t.type == Tk_String){
-		return printf("Str(\"%.*s\")", str_fmt(t.value_string));
-	}
-	if(t.type == Tk_Char){
-		return printf("Char(%d)", t.value_char);
-	}
-	if(t.type == Tk_Id){
-		return printf("Id(%.*s)", str_fmt(t.lexeme));
-	}
-
-	String name = token_type_name[t.type];
-	return printf("%.*s", str_fmt(name));
-}
-
 int main(){
 	String s = str_lit(
 		"([ _  += ](){})>>=>>><<=<<<"
@@ -53,9 +16,14 @@ int main(){
 		" 69.420e-5"
 	);
 
+	isize temp_size = 24 * mem_kilobyte;
 	isize arena_size = 128 * mem_kilobyte;
+
 	byte* arena_mem = heap_alloc(arena_size, alignof(void*));
+	byte* temp_mem = heap_alloc(temp_size, alignof(void*));
+
 	Arena arena = arena_create_buffer(arena_mem, arena_size);
+	Arena temp_arena = arena_create_buffer(temp_mem, temp_size);
 
 	Lexer lex = {
 		.source = s,
@@ -66,8 +34,8 @@ int main(){
 		token.type != Tk_EndOfFile;
 		token = lexer_next(&lex))
 	{
-		token_print(token);
-		printf("\n");
+		printf("%s\n", token_format(token, &temp_arena).v);
+		arena_reset(&temp_arena);
 	}
 
 	for(CompilerError* error = lex.error;

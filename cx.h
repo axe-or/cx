@@ -1,6 +1,7 @@
 #pragma once
 #include "base/types.h"
 #include "base/memory.h"
+#include "base/string.h"
 
 typedef enum {
 	CompilerError_UnknownToken,
@@ -135,3 +136,7 @@ Token lexer_match_identifier_or_keyword(Lexer* lex);
 Token lexer_match_string(Lexer* lex);
 
 Token lexer_next(Lexer* lex);
+
+void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...) str_attribute_format(3,4);
+
+String token_format(Token t, Arena* arena);

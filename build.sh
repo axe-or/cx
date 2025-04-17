@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 
-set -eu
+cc=clang
+cflags='-std=c17 -Os -fno-strict-aliasing -fwrapv'
+wflags='-Wall -Wextra -Werror -Wno-error=unused-variable'
 
-clang -Os -std=c17 -Wall -Wextra -fno-strict-aliasing -fwrapv -Werror -Wno-error=unused-variable -o cx.exe main.c base/base.c
+set -xeu
+
+$cc $cflags $wflags -o cx.exe main.c base/base.c cx.c
 
