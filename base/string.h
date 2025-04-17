@@ -55,3 +55,4 @@ bool str_starts_with(String s, String prefix);
 
 bool str_ends_with(String s, String postfix);
 
+bool rune_is_digit(rune r, int base);

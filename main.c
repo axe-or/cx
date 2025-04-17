@@ -233,6 +233,60 @@ bool is_whitespace(rune c){
 	return (c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') || (c == '\v');
 }
 
+Token lexer_match_number(Lexer* lex){
+	lex->previous = lex->current;
+	// Try to consume numerical prefix
+	rune c0 = lexer_advance(lex);
+	lexer_advance(lex);
+	String cur = lexer_current_lexeme(lex);
+	Token res = {};
+
+	ensure(is_decimal(c0), "Lexer not in a number");
+
+	int base = 0;
+
+	if(str_starts_with(cur, str_lit("0b")) || str_starts_with(cur, str_lit("0B"))){
+		base = 2;
+	}
+	else if(str_starts_with(cur, str_lit("0o")) || str_starts_with(cur, str_lit("0O"))){
+		base = 8;
+	}
+	else if(str_starts_with(cur, str_lit("0x")) || str_starts_with(cur, str_lit("0X"))){
+		base = 16;
+	}
+
+	// ensure(base != 0, "Invalid abse");
+
+	if(base > 0){
+		lex->previous = lex->current;
+		for(;;){
+			rune c = lexer_advance(lex);
+			if(c == 0){ break; }
+			if(c == '_'){ continue; }
+
+			if(!rune_is_digit(c, base)){
+				lex->current -= utf8_rune_size(c);
+				break;
+			}
+		}
+
+		String digits = lexer_current_lexeme(lex);
+		i64 value = 0;
+		if(!str_parse_i64(digits, base, &value)){
+			panic("bad int");
+		}
+
+		res.value_integer = value;
+		res.type = Tk_Integer;
+		res.lexeme = digits;
+	}
+	else {
+		lex->current = lex->previous;
+		panic("Decimal");
+	}
+
+	return res;
+}
 
 int token_print(Token t){
 	ensure(t.type >= 0 && t.type < Tk__COUNT, "Invalid type value");
@@ -272,7 +326,7 @@ Token lexer_match_arith_or_assign(Lexer* lex, TokenType alt){
 }
 
 static inline
-Token lexer_match_identifier(Lexer* lex){
+Token lexer_match_identifier_or_keyword(Lexer* lex){
 	lex->previous = lex->current;
 	Token res = {
 		.type = Tk_Id,
@@ -397,15 +451,17 @@ Token lexer_next(Lexer* lex){
 
 	default:
 		if(is_decimal(c)){
-			unimplemented("num");
+			lex->current -= utf8_rune_size(c);
+			res = lexer_match_number(lex);
 		}
 		else if(is_identifier(c)){
 			lex->current -= utf8_rune_size(c);
-			res = lexer_match_identifier(lex);
+			res = lexer_match_identifier_or_keyword(lex);
 		}
 		else {
 			panic("bah");
 		}
+	break;
 	}
 
 	return res;
@@ -415,11 +471,19 @@ int main(){
 	String s = str_lit(
 		"([ _  += ](){})>>=>>><<=<<<"
 		"let skibi: i32 = bop"
+		" 0xff_00_1a"
+		" 0b1010"
+		" 0o777"
 	);
 
 	Lexer lex = {
 		.source = s,
 	};
+
+	i64 v = 0;
+	String sn = str_lit("600");
+	str_parse_i64(sn, 16, &v);
+	printf("%td\n", v);
 
 	for(Token token = lexer_next(&lex);
 		token.type != Tk_EndOfFile;

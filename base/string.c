@@ -1,6 +1,16 @@
 #include "string.h"
 #include <stdlib.h>
 
+bool rune_is_digit(rune r, int base){
+	switch(base){
+	case 2:  return r >= '0' && r <= '1';
+	case 8:  return r >= '0' && r <= '7';
+	case 10: return r >= '0' && r <= '9';
+	case 16: return (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F');
+	}
+	return false;
+}
+
 isize str_compare(String left, String right){
 	if(left.len > right.len){
 		return left.len;
