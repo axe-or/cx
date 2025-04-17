@@ -3,5 +3,7 @@
 #include "memory.c"
 #include "arena.c"
 #include "heap.c"
-#include "string.c"
+
 #include "utf8.c"
+#include "string.c"
+#include "format.c"

@@ -3,10 +3,28 @@
 #include "base/memory.h"
 #include "base/string.h"
 
+typedef enum {
+	CompilerError_UnknownToken,
+	CompilerError_InvalidNumber,
+} CompilerErrorType;
+
+typedef struct CompilerError CompilerError;
+
+struct CompilerError {
+	String filename;
+	isize offset;
+	String message;
+	u32 type;
+	CompilerError* next;
+};
+
 typedef struct {
 	String source;
 	isize current;
 	isize previous;
+
+	CompilerError* error;
+	Arena* arena;
 } Lexer;
 
 typedef enum {
@@ -83,6 +101,25 @@ typedef enum {
 
 	Tk__COUNT,
 } TokenType;
+
+typedef struct {
+	String lexeme;
+	u32 type;
+
+	union {
+		f64    value_real;
+		i64    value_integer;
+		rune   value_char;
+		String value_string;
+		u32    assign_operator; /* Only for Tk_AssignOp */
+	};
+} Token;
+
+typedef struct {
+	Token* tokens;
+	isize  token_count;
+	CompilerError* error;
+} LexerResult;
 
 static const struct { String lexeme; TokenType type; } token_keywords[] = {
 	{ str_lit("let"), Tk_Let },
@@ -162,19 +199,6 @@ static const String token_type_name[] = {
 
 #define c_array_length(A) ((isize)(sizeof(A) / sizeof(A[0])))
 
-typedef struct {
-	String lexeme;
-	u32 type;
-
-	union {
-		f64    value_real;
-		i64    value_integer;
-		rune   value_char;
-		String value_string;
-		u32    assign_operator; /* Only for Tk_AssignOp */
-	};
-} Token;
-
 rune lexer_peek(Lexer* lex, isize delta){
 	isize pos = lex->current + delta;
 	if(pos < 0 || pos >= lex->source.len){
@@ -183,6 +207,21 @@ rune lexer_peek(Lexer* lex, isize delta){
 
 	UTF8Decoded dec = utf8_decode(lex->source.v + pos, lex->source.len - pos);
 	return dec.codepoint;
+}
+
+void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...){
+	String s = {};
+	CompilerError* new_error = arena_make(lex->arena, CompilerError, 1);
+	new_error->type = errtype;
+	new_error->next = lex->error;
+	lex->error = new_error;
+
+	va_list argp;
+	va_start(argp, fmt);
+	new_error->message = str_vformat(lex->arena, fmt, argp);
+	va_end(argp);
+
+
 }
 
 rune lexer_advance(Lexer* lex){
@@ -310,9 +349,7 @@ Token lexer_match_number(Lexer* lex){
 			}
 		}
 
-
 		String digits = lexer_current_lexeme(lex);
-
 		if(is_float){
 			res.type = Tk_Real;
 			f64 val = 0;
@@ -329,7 +366,6 @@ Token lexer_match_number(Lexer* lex){
 			}
 			res.value_integer = val;
 		}
-
 	}
 
 	return res;
@@ -398,6 +434,12 @@ Token lexer_match_identifier_or_keyword(Lexer* lex){
 		}
 	}
 	return res;
+}
+
+Token lexer_match_string(Lexer* lex){
+	lex->previous = lex->current;
+	ensure(lexer_peek(lex, 0) == '"', "Not at start of string");
+	unimplemented("str");
 }
 
 Token lexer_next(Lexer* lex){
@@ -494,6 +536,10 @@ Token lexer_next(Lexer* lex){
 		} else {
 			res.type = Tk_Bang;
 		}
+	break;
+
+	case '"':
+		res = lexer_match_string(lex);
 	break;
 
 	default:
