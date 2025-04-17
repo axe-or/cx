@@ -14,6 +14,8 @@
 	#define force_inline __attribute__((always_inline)) inline
 #endif
 
+#define c_array_length(A) ((isize)(sizeof(A) / sizeof(A[0])))
+
 #define static_assert(Pred, Msg) _Static_assert((Pred), (Msg))
 
 #define min(A, B) (((A) < (B)) ? (A) : (B))
