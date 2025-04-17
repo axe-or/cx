@@ -64,6 +64,7 @@ typedef enum {
 	Tk_Id,
 
 	// Keywords
+	Tk_Let,
 	Tk_Fn,
 	Tk_Return,
 	Tk_If,
@@ -84,6 +85,7 @@ typedef enum {
 } TokenType;
 
 static const struct { String lexeme; TokenType type; } token_keywords[] = {
+	{ str_lit("let"), Tk_Let },
 	{ str_lit("fn"), Tk_Fn },
 	{ str_lit("return"), Tk_Return },
 	{ str_lit("if"), Tk_If },
@@ -142,8 +144,23 @@ static const String token_type_name[] = {
 	[Tk_Char]    = str_lit("Char"),
 	[Tk_Id]      = str_lit("Id"),
 
+	[Tk_False]    = str_lit("false"),
+	[Tk_True]     = str_lit("true"),
+	[Tk_Nil]      = str_lit("nil"),
+	[Tk_Match]    = str_lit("match"),
+	[Tk_Continue] = str_lit("continue"),
+	[Tk_Break]    = str_lit("break"),
+	[Tk_For]      = str_lit("for"),
+	[Tk_Else]     = str_lit("else"),
+	[Tk_If]       = str_lit("if"),
+	[Tk_Return]   = str_lit("return"),
+	[Tk_Fn]       = str_lit("fn"),
+	[Tk_Let]      = str_lit("let"),
+
 	[Tk__COUNT] = {},
 };
+
+#define c_array_length(A) ((isize)(sizeof(A) / sizeof(A[0])))
 
 typedef struct {
 	String lexeme;
@@ -272,9 +289,13 @@ Token lexer_match_identifier(Lexer* lex){
 		}
 	}
 
-
-	//TODO: kewyrod
 	res.lexeme = lexer_current_lexeme(lex);
+
+	for(isize i = 0; i < c_array_length(token_keywords); i += 1){
+		if(str_equals(res.lexeme, token_keywords[i].lexeme)){
+			res.type = token_keywords[i].type;
+		}
+	}
 	return res;
 }
 
@@ -393,7 +414,7 @@ Token lexer_next(Lexer* lex){
 int main(){
 	String s = str_lit(
 		"([ _  += ](){})>>=>>><<=<<<"
-		"let skibi = bop"
+		"let skibi: i32 = bop"
 	);
 
 	Lexer lex = {
