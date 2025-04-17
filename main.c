@@ -194,6 +194,10 @@ static const String token_type_name[] = {
 	[Tk_Fn]       = str_lit("fn"),
 	[Tk_Let]      = str_lit("let"),
 
+	[Tk_Invalid]   = str_lit("<INVALID>"),
+	[Tk_EndOfFile] = str_lit("EndOfFile"),
+	
+
 	[Tk__COUNT] = {},
 };
 
@@ -209,7 +213,8 @@ rune lexer_peek(Lexer* lex, isize delta){
 	return dec.codepoint;
 }
 
-void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...){
+str_attribute_format(3,4)
+void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restrict fmt, ...) {
 	String s = {};
 	CompilerError* new_error = arena_make(lex->arena, CompilerError, 1);
 	new_error->type = errtype;
@@ -220,8 +225,6 @@ void lexer_emit_error(Lexer* lex, CompilerErrorType errtype, char const * restri
 	va_start(argp, fmt);
 	new_error->message = str_vformat(lex->arena, fmt, argp);
 	va_end(argp);
-
-
 }
 
 rune lexer_advance(Lexer* lex){
@@ -293,11 +296,14 @@ Token lexer_match_number(Lexer* lex){
 	else if(str_starts_with(cur, str_lit("0x")) || str_starts_with(cur, str_lit("0X"))){
 		base = 16;
 	}
+	else {
+		base = 10;
+	}
 
-	// ensure(base != 0, "Invalid abse");
-
-	if(base > 0){
+	if(base != 10){
 		lex->previous = lex->current;
+		bool bad = false;
+
 		for(;;){
 			rune c = lexer_advance(lex);
 			if(c == 0){ break; }
@@ -305,14 +311,18 @@ Token lexer_match_number(Lexer* lex){
 
 			if(!rune_is_digit(c, base)){
 				lex->current -= utf8_rune_size(c);
+				if(is_alpha(c)){ bad = true; }
 				break;
 			}
 		}
 
 		String digits = lexer_current_lexeme(lex);
 		i64 value = 0;
-		if(!str_parse_i64(digits, base, &value)){
-			panic("bad int");
+		if(bad || !str_parse_i64(digits, base, &value)){
+			String bad_lexeme = str_sub(lex->source, lex->previous - 2, lex->current + 1);
+			lexer_emit_error(lex, CompilerError_InvalidNumber, "Bad integer literal: '%.*s'", str_fmt(bad_lexeme));
+			res.type = Tk_Invalid;
+			return res;
 		}
 
 		res.value_integer = value;
@@ -567,26 +577,32 @@ int main(){
 		" 0xff_00_1a"
 		" 0b1010"
 		" 0o777"
-		" 69_420"
+		" 69f420"
 		" 69.420e-5"
 	);
 
+	isize arena_size = 128 * mem_kilobyte;
+	byte* arena_mem = heap_alloc(arena_size, alignof(void*));
+	Arena arena = arena_create_buffer(arena_mem, arena_size);
+
 	Lexer lex = {
 		.source = s,
+		.arena = &arena,
 	};
-
-	i64 v = 0;
-	String sn = str_lit("600");
-	str_parse_i64(sn, 16, &v);
-	printf("%td\n", v);
 
 	for(Token token = lexer_next(&lex);
 		token.type != Tk_EndOfFile;
 		token = lexer_next(&lex))
 	{
-		// printf("%.*s\n", str_fmt(token_type_name[token.type]));
 		token_print(token);
 		printf("\n");
+	}
+
+	for(CompilerError* error = lex.error;
+		error != NULL;
+		error = error->next)
+	{
+		printf("\e[31mError\e[0m: %.*s\n", str_fmt(error->message));
 	}
 }
 
