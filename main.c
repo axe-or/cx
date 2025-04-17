@@ -83,6 +83,20 @@ typedef enum {
 	Tk__COUNT,
 } TokenType;
 
+static const struct { String lexeme; TokenType type; } token_keywords[] = {
+	{ str_lit("fn"), Tk_Fn },
+	{ str_lit("return"), Tk_Return },
+	{ str_lit("if"), Tk_If },
+	{ str_lit("else"), Tk_Else },
+	{ str_lit("for"), Tk_For },
+	{ str_lit("brea"), Tk_Break },
+	{ str_lit("continue"), Tk_Continue },
+	{ str_lit("match"), Tk_Match },
+	{ str_lit("nil"), Tk_Nil },
+	{ str_lit("true"), Tk_True },
+	{ str_lit("false"), Tk_False },
+};
+
 static const String token_type_name[] = {
 	[Tk_ParenOpen]   = str_lit("("),
 	[Tk_ParenClose]  = str_lit(")"),
@@ -97,7 +111,7 @@ static const String token_type_name[] = {
 	[Tk_Semicolon]  = str_lit(";"),
 	[Tk_Assign]     = str_lit("="),
 	[Tk_Underscore] = str_lit("_"),
-	[Tk_AssignOp]   = str_lit("<AssignOp>"),
+	[Tk_AssignOp]   = str_lit("AssignOp"),
 
 	[Tk_Plus]   = str_lit("+"),
 	[Tk_Minus]  = str_lit("-"),
@@ -111,6 +125,10 @@ static const String token_type_name[] = {
 	[Tk_ShLeft]  = str_lit("<<"),
 	[Tk_ShRight] = str_lit(">>"),
 
+	[Tk_Bang]     = str_lit("!"),
+	[Tk_LogicAnd] = str_lit("&&"),
+	[Tk_LogicOr]  = str_lit("||"),
+
 	[Tk_Gt]    = str_lit(">"),
 	[Tk_Lt]    = str_lit("<"),
 	[Tk_GtEq]  = str_lit(">="),
@@ -118,9 +136,11 @@ static const String token_type_name[] = {
 	[Tk_Eq]    = str_lit("=="),
 	[Tk_NotEq] = str_lit("!="),
 
-	[Tk_Bang]     = str_lit("!"),
-	[Tk_LogicAnd] = str_lit("&&"),
-	[Tk_LogicOr]  = str_lit("||"),
+	[Tk_Integer] = str_lit("Int"),
+	[Tk_Real]    = str_lit("Real"),
+	[Tk_String]  = str_lit("String"),
+	[Tk_Char]    = str_lit("Char"),
+	[Tk_Id]      = str_lit("Id"),
 
 	[Tk__COUNT] = {},
 };
@@ -163,7 +183,7 @@ rune lexer_advance(Lexer* lex){
 	return dec.codepoint;
 }
 
-bool lexer_match_advance(Lexer* lex, rune target){
+bool lexer_advance_if(Lexer* lex, rune target){
 	rune c = lexer_peek(lex, 0);
 	if(c == target){
 		lex->current += utf8_rune_size(c);
@@ -196,12 +216,66 @@ bool is_whitespace(rune c){
 	return (c == ' ') || (c == '\t') || (c == '\r') || (c == '\n') || (c == '\v');
 }
 
-#define MATCH_ASSIGN(Type) {\
-	res.type = Type; \
-	if(lexer_match_advance(lex, '=')){ \
-		res.assign_operator = Type; \
-		res.type = Tk_AssignOp; \
-	} \
+
+int token_print(Token t){
+	ensure(t.type >= 0 && t.type < Tk__COUNT, "Invalid type value");
+
+	if(t.type == Tk_Integer){
+		return printf("Int(%td)", t.value_integer);
+	}
+	if(t.type == Tk_Real){
+		return printf("Int(%g)", t.value_real);
+	}
+	if(t.type == Tk_String){
+		return printf("Str(\"%.*s\")", str_fmt(t.value_string));
+	}
+	if(t.type == Tk_Char){
+		return printf("Char(%d)", t.value_char);
+	}
+	if(t.type == Tk_Id){
+		return printf("Id(%.*s)", str_fmt(t.lexeme));
+	}
+
+	String name = token_type_name[t.type];
+	return printf("%.*s", str_fmt(name));
+}
+
+static inline
+Token lexer_match_arith_or_assign(Lexer* lex, TokenType alt){
+	Token res = {
+		.type = alt,
+	};
+
+	if(lexer_advance_if(lex, '=')){
+		res.assign_operator = alt;
+		res.type = Tk_AssignOp;
+	}
+
+	return res;
+}
+
+static inline
+Token lexer_match_identifier(Lexer* lex){
+	lex->previous = lex->current;
+	Token res = {
+		.type = Tk_Id,
+	};
+	ensure(is_identifier(lexer_peek(lex, 0)), "Lexer is not on an identifier");
+
+	for(;;){
+		rune c = lexer_advance(lex);
+		if(c == 0){ break; }
+
+		if(!is_identifier(c)){
+			lex->current -= utf8_rune_size(c);
+			break;
+		}
+	}
+
+
+	//TODO: kewyrod
+	res.lexeme = lexer_current_lexeme(lex);
+	return res;
 }
 
 Token lexer_next(Lexer* lex){
@@ -232,7 +306,7 @@ Token lexer_next(Lexer* lex){
 	case ',': res.type = Tk_Comma; break;
 	case '.': res.type = Tk_Dot; break;
 	case '=':
-		if(lexer_match_advance(lex, '=')){
+		if(lexer_advance_if(lex, '=')){
 			res.type = Tk_Eq;
 		} else {
 			res.type = Tk_Assign;
@@ -246,46 +320,46 @@ Token lexer_next(Lexer* lex){
 		}
 	break;
 
-	case '+': MATCH_ASSIGN(Tk_Plus); break;
-	case '-': MATCH_ASSIGN(Tk_Minus); break;
-	case '*': MATCH_ASSIGN(Tk_Star); break;
-	case '%': MATCH_ASSIGN(Tk_Modulo); break;
+	case '+': res = lexer_match_arith_or_assign(lex, Tk_Plus); break;
+	case '-': res = lexer_match_arith_or_assign(lex, Tk_Minus); break;
+	case '*': res = lexer_match_arith_or_assign(lex, Tk_Star); break;
+	case '%': res = lexer_match_arith_or_assign(lex, Tk_Modulo); break;
 	case '/':
-		if(lexer_match_advance(lex, '/')){
+		if(lexer_advance_if(lex, '/')){
 			unimplemented("COmment");
 		} else {
-			MATCH_ASSIGN(Tk_Slash);
+			res = lexer_match_arith_or_assign(lex, Tk_Slash);
 		}
 	break;
 
 	case '~': res.type = Tk_Tilde; break;
 	case '&':
-		if(lexer_match_advance(lex, '&')){
+		if(lexer_advance_if(lex, '&')){
 			res.type = Tk_LogicAnd;
 		} else {
-			MATCH_ASSIGN(Tk_And);
+			res = lexer_match_arith_or_assign(lex, Tk_And);
 		}
 	break;
 	case '|':
-		if(lexer_match_advance(lex, '|')){
+		if(lexer_advance_if(lex, '|')){
 			res.type = Tk_LogicOr;
 		} else {
-			MATCH_ASSIGN(Tk_Or);
+			res = lexer_match_arith_or_assign(lex, Tk_Or);
 		}
 	break;
 	case '>':
-		if(lexer_match_advance(lex, '>')){
-			MATCH_ASSIGN(Tk_ShRight);
-		} else if(lexer_match_advance(lex, '=')) {
+		if(lexer_advance_if(lex, '>')){
+			res = lexer_match_arith_or_assign(lex, Tk_ShRight);
+		} else if(lexer_advance_if(lex, '=')) {
 			res.type = Tk_GtEq;
 		} else {
 			res.type = Tk_Gt;
 		}
 	break;
 	case '<':
-		if(lexer_match_advance(lex, '<')){
-			MATCH_ASSIGN(Tk_ShLeft);
-		} else if(lexer_match_advance(lex, '=')) {
+		if(lexer_advance_if(lex, '<')){
+			res = lexer_match_arith_or_assign(lex, Tk_ShLeft);
+		} else if(lexer_advance_if(lex, '=')) {
 			res.type = Tk_LtEq;
 		} else {
 			res.type = Tk_Lt;
@@ -293,22 +367,33 @@ Token lexer_next(Lexer* lex){
 	break;
 
 	case '!':
-		if(lexer_match_advance(lex, '=')){
+		if(lexer_advance_if(lex, '=')){
 			res.type = Tk_NotEq;
 		} else {
 			res.type = Tk_Bang;
 		}
 	break;
+
+	default:
+		if(is_decimal(c)){
+			unimplemented("num");
+		}
+		else if(is_identifier(c)){
+			lex->current -= utf8_rune_size(c);
+			res = lexer_match_identifier(lex);
+		}
+		else {
+			panic("bah");
+		}
 	}
 
 	return res;
 }
 
-#undef MATCH_ASSIGN
-
 int main(){
 	String s = str_lit(
 		"([ _  += ](){})>>=>>><<=<<<"
+		"let skibi = bop"
 	);
 
 	Lexer lex = {
@@ -319,7 +404,9 @@ int main(){
 		token.type != Tk_EndOfFile;
 		token = lexer_next(&lex))
 	{
-		printf("%.*s\n", str_fmt(token_type_name[token.type]));
+		// printf("%.*s\n", str_fmt(token_type_name[token.type]));
+		token_print(token);
+		printf("\n");
 	}
 }
 
